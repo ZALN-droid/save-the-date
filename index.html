@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Scratch Reveal</title>
+
+<style>
+html, body{
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  background:black;
+  touch-action:none;
+  font-family:Arial, sans-serif;
+}
+
+.container{
+  position:fixed;
+  inset:0;
+}
+
+/* background image */
+img{
+  position:absolute;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:black;
+}
+
+/* scratch layer */
+canvas{
+  position:absolute;
+  inset:0;
+}
+
+/* overlay text (BIG + RESPONSIVE) */
+.message{
+  position:absolute;
+  inset:0;
+
+  display:flex;
+  flex-direction:column;
+
+  justify-content:center;
+  align-items:center;
+
+  text-align:center;
+
+  color:white;
+
+  font-size:clamp(38px, 9vw, 80px);
+  font-weight:500;
+
+  letter-spacing:1px;
+
+  background:rgba(0,0,0,0.25);
+
+  pointer-events:none;
+  z-index:5;
+
+  transition:opacity 0.5s ease;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <img src="invite.jpg" loading="eager" decoding="async">
+
+  <div class="message" id="msg">
+    Scratch to reveal
+  </div>
+
+  <canvas id="c"></canvas>
+
+</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#c0c0c0";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+resize();
+window.addEventListener("resize", resize);
+
+let drawing = false;
+let lastX = null;
+let lastY = null;
+let revealed = false;
+
+/* smooth scratch */
+function scratch(x,y){
+
+  ctx.globalCompositeOperation = "destination-out";
+
+  if(lastX === null){
+    lastX = x;
+    lastY = y;
+  }
+
+  const dx = x - lastX;
+  const dy = y - lastY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+
+  for(let i=0;i<dist;i+=3){
+
+    const px = lastX + dx*(i/dist);
+    const py = lastY + dy*(i/dist);
+
+    ctx.beginPath();
+    ctx.arc(px,py,40,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  lastX = x;
+  lastY = y;
+}
+
+/* reveal logic */
+function checkReveal(){
+
+  if(revealed) return;
+
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+
+  let cleared = 0;
+  const step = 100;
+
+  for(let i=0;i<data.length;i+=4*step){
+    if(data[i+3] === 0){
+      cleared++;
+    }
+  }
+
+  const ratio = cleared / (data.length/(4*step));
+
+  if(ratio > 0.45){
+
+    revealed = true;
+
+    document.getElementById("msg").style.opacity = "0";
+
+    canvas.style.transition = "opacity 0.7s ease";
+    canvas.style.opacity = "0";
+  }
+}
+
+/* mouse */
+canvas.addEventListener("mousedown", ()=> drawing=true);
+
+canvas.addEventListener("mouseup", ()=>{
+  drawing=false;
+  lastX=null;
+  lastY=null;
+});
+
+canvas.addEventListener("mousemove",(e)=>{
+  if(!drawing || revealed) return;
+
+  const r = canvas.getBoundingClientRect();
+
+  scratch(e.clientX-r.left,e.clientY-r.top);
+  checkReveal();
+});
+
+/* touch */
+canvas.addEventListener("touchstart", ()=> drawing=true);
+
+canvas.addEventListener("touchend", ()=>{
+  drawing=false;
+  lastX=null;
+  lastY=null;
+});
+
+canvas.addEventListener("touchmove",(e)=>{
+  e.preventDefault();
+
+  if(revealed) return;
+
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+
+  scratch(t.clientX-r.left,t.clientY-r.top);
+  checkReveal();
+
+},{passive:false});
+
+</script>
+
+</body>
+</html>
